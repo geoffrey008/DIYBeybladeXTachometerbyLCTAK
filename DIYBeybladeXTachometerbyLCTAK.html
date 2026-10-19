@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-HK" class="dark scroll-smooth">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Geo BeybladeX DIY轉速器 by l.ctak (Midnight Purple)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gtr: {
+              bg: '#08050e',        /* 深邃紫夜極黑 */
+              base: '#0d0917',      /* R32 午夜底漆 */
+              card: '#160e26',      /* 金屬紫車身漆面 */
+              cardLight: '#1f1437', /* 光照下透射出的深紫輝光 */
+              border: '#352157',    /* 紫曜鈑件邊界線 */
+              borderGlow: '#532e8c',
+              neon: '#c084fc',      /* 霓虹紫 */
+              magenta: '#f472b6',   /* GTR 車尾紫粉反射光 */
+              violet: '#a855f7',
+              cyan: '#67e8f9',      /* 儀表冷光色 */
+              textMuted: '#9d8ec2',
+              silver: '#f5f3ff'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #08050e;
+      color: #f5f3ff;
+      background-image: 
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(168, 85, 247, 0.18), transparent 70%),
+        radial-gradient(rgba(192, 132, 252, 0.04) 1px, transparent 1px);
+      background-size: 100% 100%, 28px 28px;
+    }
+    .gtr-glow {
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.25), 0 0 50px rgba(244, 114, 182, 0.1);
+    }
+    .gtr-glow-btn {
+      box-shadow: 0 0 16px rgba(192, 132, 252, 0.4);
+    }
+    .oled-box {
+      background: #020104;
+      border: 1px solid #3d2466;
+      border-radius: 8px;
+      box-shadow: inset 0 0 16px rgba(0,0,0,0.9), 0 8px 24px rgba(13, 9, 23, 0.8);
+    }
+    .oled-canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 128 / 32;
+      image-rendering: pixelated;
+    }
+    /* 鼠標動態追蹤環境光暈 */
+    #mouse-glow {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 520px;
+      height: 520px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      background: radial-gradient(circle, rgba(192, 132, 252, 0.14) 0%, rgba(168, 85, 247, 0.08) 40%, rgba(244, 114, 182, 0.03) 65%, transparent 75%);
+      filter: blur(48px);
+      transform: translate3d(-1000px, -1000px, 0);
+      transition: opacity 0.4s ease;
+      will-change: transform;
+    }
+    /* 導航滑塊平滑過渡動畫 */
+    #tab-slider {
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .tab-btn.active {
+      color: #0d061a !important;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased text-gray-100 relative overflow-x-hidden">
+
+  <!-- 鼠標互動跟隨光效 -->
+  <div id="mouse-glow"></div>
+
+  <!-- 頂部導航列 -->
+  <header class="sticky top-0 z-40 border-b border-gtr-border/80 bg-[#08050ee6] backdrop-blur-xl">
+    <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 cursor-pointer select-none" onclick="switchTab('home')">
+        <div class="w-9 h-9 rounded-lg border border-gtr-neon flex items-center justify-center font-mono font-extrabold text-sm text-gtr-neon bg-gtr-card shadow-[0_0_12px_rgba(192,132,252,0.3)]">
+          GX
+        </div>
+        <div>
+          <span class="font-extrabold text-sm tracking-wide text-gtr-silver block leading-tight">Geo BeybladeX DIY轉速器</span>
+          <span class="font-mono text-[10px] text-gtr-neon tracking-widest block uppercase font-bold">by l.ctak</span>
+        </div>
+      </div>
+
+      <!-- 分頁切換選單 (含滑動指示器) -->
+      <nav id="main-nav" class="relative flex items-center bg-gtr-base/90 p-1 rounded-xl border border-gtr-border text-xs font-semibold backdrop-blur-md">
+        <!-- 動畫滑塊背景 -->
+        <div id="tab-slider" class="absolute top-1 bottom-1 rounded-lg bg-gradient-to-r from-gtr-violet to-gtr-neon shadow-[0_0_15px_rgba(192,132,252,0.5)] pointer-events-none z-0"></div>
+        
+        <button type="button" onclick="switchTab('home')" id="tab-btn-home" class="tab-btn active relative z-10 px-3.5 py-1.5 rounded-lg transition-colors duration-200">
+          更新韌體
+        </button>
+        <button type="button" onclick="switchTab('diy')" id="tab-btn-diy" class="tab-btn relative z-10 px-3.5 py-1.5 rounded-lg transition-colors duration-200 text-gtr-textMuted hover:text-gtr-silver">
+          DIY 款指南
+        </button>
+        <button type="button" onclick="switchTab('pro')" id="tab-btn-pro" class="tab-btn relative z-10 px-3.5 py-1.5 rounded-lg transition-colors duration-200 text-gtr-textMuted hover:text-gtr-silver">
+          Pro 款指南
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- 核心主容器 -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-8 space-y-8">
+
+    <!-- ==================== 頁面 1: 主頁 & 更新韌體 ==================== -->
+    <section id="page-home" class="space-y-8">
+      
+      <!-- 英雄標題橫幅 -->
+      <div class="bg-gradient-to-br from-gtr-card via-gtr-base to-gtr-cardLight border border-gtr-border/90 p-6 sm:p-9 rounded-2xl relative overflow-hidden gtr-glow">
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-gtr-violet/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="max-w-2xl relative z-10">
+          <span class="inline-flex items-center gap-1.5 text-[11px] font-mono tracking-widest text-gtr-magenta font-bold uppercase mb-2">
+            <span class="w-2 h-2 rounded-full bg-gtr-magenta animate-pulse"></span>
+            MIDNIGHT PURPLE · TACHOMETER SUITE
+          </span>
+          <h1 class="text-2xl sm:text-4xl font-black text-white tracking-tight mb-3">
+            陀螺轉速計，操作簡單直覺。
+          </h1>
+          <p class="text-sm sm:text-base text-gtr-textMuted leading-relaxed mb-6">
+            本指南為玩家提供清晰的日常操作與刷機指引。點擊下方按鈕可直接下載最新版韌體或進入官方交流社群。
+          </p>
+          
+          <div class="flex flex-wrap gap-3">
+            <button onclick="switchTab('diy')" class="px-4 py-2.5 rounded-xl bg-gtr-cardLight border border-gtr-border hover:border-gtr-neon text-xs font-bold text-gtr-silver transition flex items-center gap-2">
+              <span>前往 DIY 款說明</span> &rarr;
+            </button>
+            <button onclick="switchTab('pro')" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-gtr-violet to-gtr-neon text-[#0a0515] hover:opacity-90 text-xs font-black transition flex items-center gap-2 gtr-glow-btn">
+              <span>前往 Pro 款說明</span> &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 官方重要資源與社群入口 (3 格佈局：WhatsApp 訂購 / 韌體下載 / TG 社群) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- WhatsApp 購買外殼 / PCB (最左側) -->
+        <a href="https://wa.me/85252480658" target="_blank" rel="noopener" class="group relative overflow-hidden bg-gradient-to-r from-[#0d1e17] to-gtr-card border-2 border-emerald-500/60 hover:border-emerald-400 p-6 rounded-2xl transition-all duration-300 hover:scale-[1.01] shadow-[0_0_25px_rgba(16,185,129,0.2)]">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            </div>
+            <span class="text-[11px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              WHATSAPP ORDER ↗
+            </span>
+          </div>
+          <h3 class="text-lg font-black text-white group-hover:text-emerald-400 transition-colors">
+            WhatsApp 訂購外殼 / PCB
+          </h3>
+          <p class="text-xs text-gtr-textMuted mt-1 leading-relaxed">
+            專用外殼、高精度光敏 PCB 板及散件訂購，點擊直接聯絡作者 l.ctak。
+          </p>
+        </a>
+
+        <!-- 韌體下載 (中間) -->
+        <a href="https://drive.google.com/drive/folders/1N8ZKp5IFdT1apa2UR8qLMU9RiSz4xlOh" target="_blank" rel="noopener" class="group relative overflow-hidden bg-gradient-to-r from-gtr-card to-[#23153c] border-2 border-gtr-neon/60 hover:border-gtr-neon p-6 rounded-2xl transition-all duration-300 hover:scale-[1.01] gtr-glow">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-12 h-12 rounded-xl bg-gtr-neon/20 border border-gtr-neon/50 flex items-center justify-center text-gtr-neon group-hover:scale-110 transition-transform">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </div>
+            <span class="text-[11px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-gtr-neon/20 text-gtr-neon border border-gtr-neon/40">
+              OFFICIAL DRIVE ↗
+            </span>
+          </div>
+          <h3 class="text-lg font-black text-white group-hover:text-gtr-neon transition-colors">
+            官方韌體雲端硬碟下載
+          </h3>
+          <p class="text-xs text-gtr-textMuted mt-1 leading-relaxed">
+            Google Drive韌體檔案庫，開源直接下載。
+          </p>
+        </a>
+
+        <!-- Telegram 社群 (最右側) -->
+        <a href="https://t.me/geobeybladeX" target="_blank" rel="noopener" class="group relative overflow-hidden bg-gradient-to-r from-[#21123a] to-gtr-card border-2 border-gtr-magenta/60 hover:border-gtr-magenta p-6 rounded-2xl transition-all duration-300 hover:scale-[1.01] shadow-[0_0_25px_rgba(244,114,182,0.2)]">
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-12 h-12 rounded-xl bg-gtr-magenta/20 border border-gtr-magenta/50 flex items-center justify-center text-gtr-magenta group-hover:scale-110 transition-transform">
+              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.56 8.16l-1.97 9.28c-.15.65-.53.81-1.08.5l-3-2.21-1.45 1.4c-.16.16-.3.3-.61.3l.21-3.05 5.56-5.02c.24-.22-.05-.34-.38-.12l-6.87 4.33-2.96-.92c-.64-.2-.66-.64.14-.95l11.55-4.45c.54-.2 1.01.12.86.91z"/></svg>
+            </div>
+            <span class="text-[11px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-gtr-magenta/20 text-gtr-magenta border border-gtr-magenta/40">
+              JOIN TG GROUP ↗
+            </span>
+          </div>
+          <h3 class="text-lg font-black text-white group-hover:text-gtr-magenta transition-colors">
+            Telegram 官方交流群組
+          </h3>
+          <p class="text-xs text-gtr-textMuted mt-1 leading-relaxed">
+            加入 @GeoBeybladeX 玩家社群，交流DIY轉速器心得、獲取即時更新通知。
+          </p>
+        </a>
+      </div>
+
+      <!-- 更新韌體主步驟卡片 -->
+      <div class="bg-gtr-card border border-gtr-border rounded-2xl p-6 sm:p-8 space-y-6">
+        <div class="border-b border-gtr-border pb-4">
+          <h2 class="text-xl font-black text-white flex items-center gap-2.5">
+            <span class="w-3 h-3 rounded-full bg-gtr-neon inline-block shadow-[0_0_8px_#c084fc]"></span>
+            更新韌體指南 (Firmware Update)
+          </h2>
+          <p class="text-xs text-gtr-textMuted mt-1">
+            免裝驅動程式與編譯軟體，使用 RP2040 隨身碟拖放（UF2）方式更新。
+          </p>
+        </div>
+
+        <!-- 步驟圖解 -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch">
+          <!-- 步驟 1 -->
+          <div class="bg-gtr-base/80 p-5 rounded-xl border border-gtr-border space-y-3 relative group flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-9 h-9 rounded-lg bg-gtr-card border border-gtr-border flex items-center justify-center font-mono text-gtr-neon text-sm font-extrabold">
+                01
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gtr-neon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+                <h3 class="font-bold text-sm text-white">拆卸外殼</h3>
+              </div>
+              <p class="text-xs text-gtr-textMuted leading-relaxed">
+                使用螺絲批卸下機身背後的 <b>6 顆螺絲</b>，取下上蓋露出主控核心板。
+              </p>
+            </div>
+            <!-- 圖1: XIAO RP2040 主機板結構 -->
+            <div class="mt-3 overflow-hidden rounded-lg border border-gtr-border/80 bg-black/50 p-1 relative group">
+              <img src="https://files.seeedstudio.com/wiki/XIAO-RP2040/img/xiao-rp2040-pre.jpg" alt="Seeed XIAO RP2040 主機板結構" class="w-full h-28 object-contain rounded transition-transform duration-300 group-hover:scale-105 cursor-pointer" onclick="openLightbox('https://files.seeedstudio.com/wiki/XIAO-RP2040/img/xiao-rp2040-pre.jpg', '圖1 · Seeed XIAO RP2040 主機板結構')" loading="lazy">
+              <button type="button" onclick="openLightbox('https://files.seeedstudio.com/wiki/XIAO-RP2040/img/xiao-rp2040-pre.jpg', '圖1 · Seeed XIAO RP2040 主機板結構')" class="absolute top-2 right-2 p-1.5 rounded-lg bg-[#0d0917]/85 border border-gtr-border text-gtr-neon hover:bg-gtr-neon hover:text-[#0d0917] transition-all shadow-lg flex items-center gap-1 text-[10px] font-mono font-bold" title="放大檢視">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
+                <span class="hidden sm:inline">放大</span>
+              </button>
+              <span class="block text-[10px] text-center font-mono text-gtr-neon/90 font-medium pt-1">圖1 · SEEED XIAO RP2040 核心板</span>
+            </div>
+          </div>
+
+          <!-- 步驟 2 -->
+          <div class="bg-gtr-base/80 p-5 rounded-xl border border-gtr-border space-y-3 relative group flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-9 h-9 rounded-lg bg-gtr-card border border-gtr-border flex items-center justify-center font-mono text-gtr-neon text-sm font-extrabold">
+                02
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gtr-neon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8m-8 5h8m-8 5h8M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"></path></svg>
+                <h3 class="font-bold text-sm text-white">連接電腦</h3>
+              </div>
+              <p class="text-xs text-gtr-textMuted leading-relaxed">
+                使用具備<b>數據傳輸功能</b>的 Type-C 線連接電腦與轉速器主板。
+              </p>
+            </div>
+            <div class="mt-3 p-2 rounded-lg bg-black/40 border border-gtr-border/60 text-[11px] text-gtr-textMuted text-center font-mono">
+              USB Type-C 數據連線
+            </div>
+          </div>
+
+          <!-- 步驟 3: 進入Bootloader mode -->
+          <div class="bg-gtr-base/90 p-5 rounded-xl border-2 border-gtr-neon/60 bg-gtr-neon/5 space-y-3 relative shadow-[0_0_15px_rgba(192,132,252,0.15)] flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-9 h-9 rounded-lg bg-gtr-neon text-[#0d061a] flex items-center justify-center font-mono text-sm font-black">
+                03
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gtr-neon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <h3 class="font-bold text-sm text-gtr-neon">進入Bootloader mode</h3>
+              </div>
+              <p class="text-xs text-gtr-silver leading-relaxed font-medium">
+                1. 按住 <b>BOOT</b> 鍵不放<br>
+                2. 輕按一下 <b>RESET</b><br>
+                3. 放開 <b>BOOT</b> 鍵
+              </p>
+            </div>
+            <div class="mt-3 p-2 rounded-lg bg-gtr-neon/10 border border-gtr-neon/30 text-[10px] text-gtr-neon text-center font-mono font-bold">
+              BOOT → RESET → RELEASE
+            </div>
+          </div>
+
+          <!-- 步驟 4 -->
+          <div class="bg-gtr-base/80 p-5 rounded-xl border border-gtr-border space-y-3 relative group flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-9 h-9 rounded-lg bg-gtr-card border border-gtr-border flex items-center justify-center font-mono text-gtr-neon text-sm font-extrabold">
+                04
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gtr-neon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16"></path></svg>
+                <h3 class="font-bold text-sm text-white">識別磁碟</h3>
+              </div>
+              <p class="text-xs text-gtr-textMuted leading-relaxed">
+                電腦會掛載跳出名為 <code class="bg-black/60 px-1 py-0.5 rounded text-gtr-neon font-mono font-bold">RPI-RP2</code> 的隨身碟磁區。
+              </p>
+            </div>
+            <!-- 圖2: RPI-RP2 隨身碟磁區 -->
+            <div class="mt-3 overflow-hidden rounded-lg border border-gtr-border/80 bg-black/50 p-1 relative group">
+              <img src="https://i.ibb.co/11GHzML/Whats-App-Image-2026-09-10-at-9-29-42-PM.jpg" alt="RPI-RP2 USB 磁碟機" class="w-full h-28 object-cover rounded transition-transform duration-300 group-hover:scale-105 cursor-pointer" onclick="openLightbox('https://i.ibb.co/11GHzML/Whats-App-Image-2026-09-10-at-9-29-42-PM.jpg', '圖2 · 掛載 RPI-RP2 隨身碟磁區')" loading="lazy">
+              <button type="button" onclick="openLightbox('https://i.ibb.co/11GHzML/Whats-App-Image-2026-09-10-at-9-29-42-PM.jpg', '圖2 · 掛載 RPI-RP2 隨身碟磁區')" class="absolute top-2 right-2 p-1.5 rounded-lg bg-[#0d0917]/85 border border-gtr-border text-gtr-neon hover:bg-gtr-neon hover:text-[#0d0917] transition-all shadow-lg flex items-center gap-1 text-[10px] font-mono font-bold" title="放大檢視">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path></svg>
+                <span class="hidden sm:inline">放大</span>
+              </button>
+              <span class="block text-[10px] text-center font-mono text-gtr-neon/90 font-medium pt-1">圖2 · 掛載 RPI-RP2 隨身碟</span>
+            </div>
+          </div>
+
+          <!-- 步驟 5 -->
+          <div class="bg-gtr-base/80 p-5 rounded-xl border border-gtr-border space-y-3 relative group flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="w-9 h-9 rounded-lg bg-gtr-card border border-gtr-border flex items-center justify-center font-mono text-gtr-neon text-sm font-extrabold">
+                05
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gtr-neon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h3 class="font-bold text-sm text-white">拖入韌體檔</h3>
+              </div>
+              <p class="text-xs text-gtr-textMuted leading-relaxed">
+                將下載的 <code class="bg-black/60 px-1 py-0.5 rounded text-gtr-neon font-mono font-bold">.uf2</code> 檔案直接拖入隨身碟，主機將自動重啟完成更新。
+              </p>
+            </div>
+            <div class="mt-3 p-2 rounded-lg bg-black/40 border border-gtr-border/60 text-[11px] text-gtr-textMuted text-center font-mono">
+              自動退出磁碟並重啟
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gtr-base border border-gtr-magenta/30 p-4 rounded-xl text-xs text-gtr-silver/90 flex gap-3 items-start">
+          <svg class="w-5 h-5 text-gtr-magenta shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          <div class="space-y-1">
+            <b class="text-gtr-magenta">溫馨提示：</b>
+            <p class="text-gtr-textMuted leading-relaxed">
+              若電腦沒有偵測到 <code class="font-mono font-bold text-white">RPI-RP2</code> 隨身碟，多數是因為使用的 Type-C 線材僅支援單純供電充電而無資料傳輸腳位，請換一條資料傳輸線並重新進入 <b>Bootloader mode</b>。
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== 頁面 2: DIY 款手冊 ==================== -->
+    <section id="page-diy" class="hidden space-y-8">
+      <div class="border-b border-gtr-border pb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+        <div>
+          <span class="text-[11px] font-mono text-gtr-neon tracking-widest font-bold uppercase">MODEL SPECIFICATIONS</span>
+          <h1 class="text-2xl font-black text-white">DIY 款操作手冊</h1>
+        </div>
+        <button onclick="switchTab('home')" class="text-xs text-gtr-textMuted hover:text-gtr-silver flex items-center gap-1">
+          &larr; 返回主頁
+        </button>
+      </div>
+
+      <!-- 核心特色與電量 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-gtr-card border border-gtr-border p-5 rounded-2xl space-y-2">
+          <span class="text-xs font-mono text-gtr-neon font-bold">電源與電量</span>
+          <h3 class="text-base font-black text-white">機身 4 顆 LED 辨識</h3>
+          <ul class="text-xs text-gtr-silver space-y-1.5 pt-1">
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> <b>4 顆綠燈</b>：100% 滿電</li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-emerald-300"></span> <b>3 顆淺綠</b>：75% 電量</li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> <b>2 顆黃燈</b>：50% 電量</li>
+            <li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span> <b>1 顆紅燈</b>：25% 建議充電</li>
+          </ul>
+        </div>
+
+        <div class="bg-gtr-card border border-gtr-border p-5 rounded-2xl space-y-2">
+          <span class="text-xs font-mono text-gtr-neon font-bold">日常測速流程</span>
+          <h3 class="text-base font-black text-white">開機即用 / 3 秒鎖定</h3>
+          <p class="text-xs text-gtr-textMuted leading-relaxed">
+            開機 3 秒倒數後自動進入 Ready 待機狀態。發射後即時顯示最高轉速（Max RPM）約 3 秒，隨後自動回歸待機並保存紀錄。
+          </p>
+        </div>
+
+        <div class="bg-gtr-card border border-gtr-border p-5 rounded-2xl space-y-2">
+          <span class="text-xs font-mono text-gtr-neon font-bold">歷史紀錄儲存</span>
+          <h3 class="text-base font-black text-white">最多保存 500 筆</h3>
+          <p class="text-xs text-gtr-textMuted leading-relaxed">
+            待機畫面右側常駐顯示最近 4 次測速數據；開機倒數時輕微轉動發射器可進入歷史數據瀏覽模式。
+          </p>
+        </div>
+      </div>
+
+      <!-- 畫面圖解：開機倒數、待機、測速結果 -->
+      <div class="space-y-4">
+        <h3 class="text-sm font-mono text-gtr-neon tracking-wider font-bold">常用螢幕畫面圖解</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <!-- 開機倒數畫面 -->
+          <div class="bg-gtr-card p-4 rounded-xl border border-gtr-border space-y-2">
+            <div class="flex justify-between items-center text-xs text-gtr-textMuted">
+              <span class="font-bold text-white">開機倒數 (Boot)</span>
+              <span class="text-gtr-neon font-mono">3 秒停留</span>
+            </div>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="diy-boot" width="128" height="32"></canvas>
+            </div>
+            <p class="text-[11px] text-gtr-textMuted leading-normal">
+              開機時顯示View history...321倒數；倒數時間內輕轉發射器可進歷史紀錄，亦可連開關進行校準或重設。
+            </p>
+          </div>
+
+          <!-- 待機畫面 -->
+          <div class="bg-gtr-card p-4 rounded-xl border border-gtr-border space-y-2">
+            <div class="flex justify-between items-center text-xs text-gtr-textMuted">
+              <span class="font-bold text-white">待機狀態 (Ready)</span>
+              <span>右側前 4 筆</span>
+            </div>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="diy-ready" width="128" height="32"></canvas>
+            </div>
+            <p class="text-[11px] text-gtr-textMuted leading-normal">
+              隨時可以發射陀螺，右側縱列即時展示前 4 次發射紀錄，左側 Ready 提示測速就緒。
+            </p>
+          </div>
+
+          <!-- 測速結果畫面 -->
+          <div class="bg-gtr-card p-4 rounded-xl border border-gtr-border space-y-2">
+            <div class="flex justify-between items-center text-xs text-gtr-textMuted">
+              <span class="font-bold text-white">測速結果 (Max RPM)</span>
+              <span>鎖定 3 秒</span>
+            </div>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="diy-result" width="128" height="32"></canvas>
+            </div>
+            <p class="text-[11px] text-gtr-textMuted leading-normal">
+              發射瞬間自動感應，左側大字顯示本次最高轉速，約 3 秒後自動保存並返回待機。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto Calibration 自動校準教學與畫面圖解 -->
+      <div class="bg-gradient-to-br from-gtr-card to-gtr-base border-2 border-gtr-border rounded-2xl p-6 sm:p-8 space-y-6">
+        <div class="border-b border-gtr-border pb-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h2 class="text-xl font-black text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-gtr-neon inline-block shadow-[0_0_8px_#c084fc]"></span>
+              Auto Calibration 自動光敏校準教學
+            </h2>
+            <span class="text-xs font-mono text-gtr-neon bg-gtr-cardLight px-2.5 py-1 rounded-md border border-gtr-border">
+              開機連續開關 3 次觸發
+            </span>
+          </div>
+          <p class="text-xs text-gtr-textMuted mt-1 leading-relaxed">
+            <b>何時需要校準？</b>當你第一次使用、更換發射器或發現測速出現異常時，請執行自動校準。
+          </p>
+        </div>
+
+        <!-- 校準步驟與圖解流程 -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <!-- 步驟 1 -->
+          <div class="bg-gtr-cardLight/50 p-4 rounded-xl border border-gtr-border space-y-2.5">
+            <span class="font-mono text-xs font-extrabold text-gtr-neon">步驟 1 · 觸發校準</span>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="diy-cal-start" width="128" height="32"></canvas>
+            </div>
+            <p class="text-xs text-gtr-silver font-semibold pt-1">連續開關電源 3 次</p>
+            <p class="text-[11px] text-gtr-textMuted leading-relaxed">
+              螢幕跳出 <code class="text-gtr-neon">Auto Calibration</code>，並進行 5 秒倒數，請在這段時間內準備好發射陀螺。
+            </p>
+          </div>
+
+          <!-- 步驟 2 -->
+          <div class="bg-gtr-cardLight/50 p-4 rounded-xl border border-gtr-border space-y-2.5">
+            <span class="font-mono text-xs font-extrabold text-gtr-neon">步驟 2 · 8秒內用力拉發</span>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="diy-cal-waiting" width="128" height="32"></canvas>
+            </div>
+            <p class="text-xs text-gtr-silver font-semibold pt-1">等待畫面提示：Waiting Shoot...</p>
+            <p class="text-[11px] text-gtr-textMuted leading-relaxed">
+              畫面進入 8 秒倒數，請<b>用力拉發陀螺一次</b>。系統感應到旋轉後會自動進行光學對比採樣。
+            </p>
+          </div>
+
+          <!-- 步驟 3 -->
+          <div class="bg-gtr-cardLight/50 p-4 rounded-xl border border-gtr-border space-y-2.5">
+            <span class="font-mono text-xs font-extrabold text-gtr-neon">步驟 3 · 自動儲存門檻</span>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="diy-cal-done" width="128" height="32"></canvas>
+            </div>
+            <p class="text-xs text-gtr-silver font-semibold pt-1">顯示 Cal Done! 與 High / Low 數值</p>
+            <p class="text-[11px] text-gtr-textMuted leading-relaxed">
+              計算出最佳對比度門檻並自動寫入儲存，隨後返回 Ready 待機畫面，校準即告完成！
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 開關機快捷操作彙整 -->
+      <div class="bg-gtr-card border border-gtr-border p-6 rounded-2xl space-y-4">
+        <h2 class="text-lg font-black text-white flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-gtr-neon inline-block"></span>
+          開機快捷操作一覽
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-gtr-cardLight p-4 rounded-xl border border-gtr-border space-y-1">
+            <span class="font-mono text-xl font-black text-gtr-neon block">開關 3 次</span>
+            <h4 class="text-sm font-bold text-white">自動光敏校準 (Auto Cal)</h4>
+            <p class="text-xs text-gtr-textMuted leading-relaxed">
+              自適應當前發射器，8 秒內發射陀螺即可完成最佳調整。
+            </p>
+          </div>
+
+          <div class="bg-gtr-cardLight p-4 rounded-xl border border-gtr-border space-y-1">
+            <span class="font-mono text-xl font-black text-gtr-neon block">開關 5 次</span>
+            <h4 class="text-sm font-bold text-white">重設原廠設定 (Reset)</h4>
+            <p class="text-xs text-gtr-textMuted leading-relaxed">
+              5 秒內快速連續開關 5 次，螢幕顯示 <code class="text-gtr-neon font-bold">CLEARED!</code>，恢復初始光敏門檻並清除所有歷史紀錄。
+            </p>
+          </div>
+
+          <div class="bg-gtr-cardLight p-4 rounded-xl border border-gtr-border space-y-1">
+            <span class="font-mono text-xl font-black text-gtr-neon block">開機轉動陀螺</span>
+            <h4 class="text-sm font-bold text-white">瀏覽歷史數據 (History)</h4>
+            <p class="text-xs text-gtr-textMuted leading-relaxed">
+              在開機倒數 3 秒內讓轉速計感測到轉動，即可進入紀錄瀏覽頁，右側固定顯示最高轉速（Top RPM）。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 頁面 3: Pro 款手冊 ==================== -->
+    <section id="page-pro" class="hidden space-y-8">
+      <div class="border-b border-gtr-border pb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+        <div>
+          <span class="text-[11px] font-mono text-gtr-neon tracking-widest font-bold uppercase">PRO SPECIFICATIONS</span>
+          <h1 class="text-2xl font-black text-white">Pro 款操作手冊</h1>
+        </div>
+        <button onclick="switchTab('home')" class="text-xs text-gtr-textMuted hover:text-gtr-silver flex items-center gap-1">
+          &larr; 返回主頁
+        </button>
+      </div>
+
+      <!-- 三向按鍵操作說明 -->
+      <div class="bg-gtr-card border border-gtr-border p-6 rounded-2xl space-y-4">
+        <h2 class="text-lg font-black text-white flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-gtr-neon inline-block shadow-[0_0_8px_#c084fc]"></span>
+          三向按鍵操作定義
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-gtr-cardLight p-4 rounded-xl border border-gtr-border space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-gtr-neon">[ LEFT ]</span>
+              <span class="text-[11px] text-gtr-textMuted">左鍵 / 上</span>
+            </div>
+            <p class="text-xs text-gtr-silver leading-relaxed">
+              選單往上移動、數值遞減（-）、自訂名稱字元切換、歷史紀錄向前翻閱。
+            </p>
+          </div>
+
+          <div class="bg-gtr-cardLight p-4 rounded-xl border-2 border-gtr-neon/50 bg-gtr-neon/5 space-y-1.5 shadow-[0_0_12px_rgba(192,132,252,0.15)]">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-gtr-neon">[ ENTER ]</span>
+              <span class="text-[11px] text-gtr-neon font-bold">中心確認鍵</span>
+            </div>
+            <p class="text-xs text-gtr-silver leading-relaxed">
+              • <b>短按</b>：確認選取／進入下一層／儲存。<br>
+              • <b>待機長按 2 秒</b>：進入系統設定選單。<br>
+              • <b>選單長按 1 秒</b>：返回上一層選單或退出。
+            </p>
+          </div>
+
+          <div class="bg-gtr-cardLight p-4 rounded-xl border border-gtr-border space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-bold text-gtr-neon">[ RIGHT ]</span>
+              <span class="text-[11px] text-gtr-textMuted">右鍵 / 下</span>
+            </div>
+            <p class="text-xs text-gtr-silver leading-relaxed">
+              選單往下移動、數值遞增（+）、自訂名稱字元切換、歷史紀錄向後翻閱。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 測速與顯示模式 (Classic & Curve) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-gtr-card border border-gtr-border p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-black text-white">Classic Mode (經典大字)</h3>
+            <span class="text-[11px] font-mono text-gtr-textMuted">預設模式</span>
+          </div>
+          <div class="oled-box p-3">
+            <canvas class="oled-canvas" data-screen="ready-classic" width="128" height="32"></canvas>
+          </div>
+          <p class="text-xs text-gtr-textMuted leading-relaxed">
+            左邊大字顯示測速結果，右邊直列顯示最近 4 次發射紀錄，最右側固定顯示 4 階電池圖示（低於 25% 時閃爍提示）。
+          </p>
+        </div>
+
+        <div class="bg-gtr-card border border-gtr-border p-5 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-black text-white">Curve Mode (動態衰減曲線)</h3>
+            <span class="text-[11px] font-mono text-gtr-neon font-bold">即時曲線</span>
+          </div>
+          <div class="oled-box p-3">
+            <canvas class="oled-canvas" data-screen="result-curve" width="128" height="32"></canvas>
+          </div>
+          <p class="text-xs text-gtr-textMuted leading-relaxed">
+            發射瞬間還原發射轉速動態，全螢幕繪製轉速衰減斜率圖，可於 Display Mode 選單中切換。
+          </p>
+        </div>
+      </div>
+
+      <!-- 系統選單結構 -->
+      <div class="bg-gtr-card border border-gtr-border p-6 rounded-2xl space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-black text-white flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-gtr-neon inline-block"></span>
+            完整系統選單結構
+          </h2>
+          <span class="text-xs text-gtr-textMuted">待機長按 Enter 2 秒開啟</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="bg-gtr-cardLight/70 p-3.5 rounded-xl border border-gtr-border space-y-1">
+            <span class="font-bold text-gtr-neon">1. History (歷史紀錄)</span>
+            <p class="text-gtr-textMuted">翻查歷史發射數據；右側常駐顯示玩家的最高轉速 (Top) 與平均轉速 (Avg)。</p>
+          </div>
+
+          <div class="bg-gtr-cardLight/70 p-3.5 rounded-xl border border-gtr-border space-y-1">
+            <span class="font-bold text-gtr-neon">2. User Select (玩家管理)</span>
+            <p class="text-gtr-textMuted">支援最多 10 位獨立玩家；可切換帳號、重新命名 (最多 15 字)、新增玩家與清除紀錄。</p>
+          </div>
+
+          <div class="bg-gtr-cardLight/70 p-3.5 rounded-xl border border-gtr-border space-y-1">
+            <span class="font-bold text-gtr-neon">3. Display Mode (顯示模式)</span>
+            <p class="text-gtr-textMuted">自由切換 Classic Mode（經典數值排版）或 Curve Mode（轉速衰減曲線）。</p>
+          </div>
+
+          <div class="bg-gtr-cardLight/70 p-3.5 rounded-xl border border-gtr-border space-y-1">
+            <span class="font-bold text-gtr-neon">4. Information (系統資訊)</span>
+            <p class="text-gtr-textMuted">檢視目前韌體版本，或直接掃描螢幕上顯示的 Telegram 交流群組點陣 QR Code。</p>
+          </div>
+
+          <div class="bg-gtr-cardLight/70 p-3.5 rounded-xl border border-gtr-border space-y-1 sm:col-span-2">
+            <span class="font-bold text-gtr-neon">5. Advanced (進階調校)</span>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1 text-[11px] text-gtr-silver">
+              <div class="bg-black/40 p-2.5 rounded-lg border border-gtr-border/60">
+                <b class="text-white">Bat Display</b><br>開啟/關閉電池 OSD 與低電量警示。
+              </div>
+              <div class="bg-black/40 p-2.5 rounded-lg border border-gtr-border/60">
+                <b class="text-white">Sensor Threshold</b><br>手動微調光敏高低門檻或執行自動校準。
+              </div>
+              <div class="bg-black/40 p-2.5 rounded-lg border border-gtr-border/60">
+                <b class="text-white">Launch Setting</b><br>調整最低轉速門檻 (預設 3500) 與結果鎖定秒數。
+              </div>
+              <div class="bg-black/40 p-2.5 rounded-lg border border-gtr-border/60">
+                <b class="text-white">RGB LED</b><br>設定常亮、呼吸、彩虹、爆閃 4 種氣氛燈效。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 進階功能螢幕示意 -->
+      <div class="space-y-4">
+        <h3 class="text-sm font-mono text-gtr-neon tracking-wider font-bold">常用功能畫面圖解</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-gtr-card p-4 rounded-xl border border-gtr-border space-y-2">
+            <span class="text-xs font-bold text-white block">玩家自訂名稱 (Rename)</span>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="rename" width="128" height="32"></canvas>
+            </div>
+            <p class="text-[11px] text-gtr-textMuted leading-normal">左/右鍵切換字元，Enter 鍵跳下一格，支援 A-Z、數字與底線。</p>
+          </div>
+
+          <div class="bg-gtr-card p-4 rounded-xl border border-gtr-border space-y-2">
+            <span class="text-xs font-bold text-white block">自動光敏校準 (Auto Cal)</span>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="sensor-cal" width="128" height="32"></canvas>
+            </div>
+            <p class="text-[11px] text-gtr-textMuted leading-normal">於選單確認後，8 秒內發射陀螺，系統自動計算最佳高低閥值。</p>
+          </div>
+
+          <div class="bg-gtr-card p-4 rounded-xl border border-gtr-border space-y-2">
+            <span class="text-xs font-bold text-white block">交流群組 QR Code (TG)</span>
+            <div class="oled-box p-3">
+              <canvas class="oled-canvas" data-screen="tg" width="128" height="32"></canvas>
+            </div>
+            <p class="text-[11px] text-gtr-textMuted leading-normal">內建點陣 QR Code，手機相機直接對準螢幕掃描即可加入交流群。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 授權與版權聲明 -->
+    <section class="bg-gtr-card/60 border border-gtr-border/80 p-5 rounded-2xl text-xs text-gtr-textMuted leading-relaxed space-y-1.5">
+      <div class="flex items-center gap-2 text-gtr-silver font-bold">
+        <svg class="w-4 h-4 text-gtr-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+        <span>授權與版權聲明 (License Notice)</span>
+      </div>
+      <p>
+        個人製作及非商業用途可自由使用本設計；如需製作並販售成品，須另行取得作者授權。台灣地區商業授權由 <b>MGC Studio</b> 協助辦理。
+      </p>
+    </section>
+
+  </main>
+
+  <!-- 圖片放大燈箱 (Lightbox Modal) -->
+  <div id="lightbox-modal" class="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl hidden flex-col items-center justify-center p-4 transition-opacity duration-300 opacity-0" onclick="closeLightbox()">
+    <div class="relative max-w-4xl w-full flex flex-col items-center" onclick="event.stopPropagation()">
+      <button type="button" onclick="closeLightbox()" class="absolute -top-12 right-0 p-2 text-gtr-silver hover:text-gtr-magenta transition flex items-center gap-1.5 text-xs font-mono font-bold bg-gtr-card/80 border border-gtr-border rounded-lg px-3">
+        <span>關閉 [ESC]</span>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <div class="rounded-2xl border-2 border-gtr-neon/70 overflow-hidden bg-black/80 shadow-[0_0_50px_rgba(192,132,252,0.35)] p-2 max-h-[80vh] flex items-center justify-center">
+        <img id="lightbox-img" src="" alt="" class="max-w-full max-h-[74vh] object-contain rounded-xl">
+      </div>
+      <p id="lightbox-caption" class="text-center font-mono text-xs text-gtr-neon font-semibold mt-3 bg-gtr-card/90 px-4 py-1.5 rounded-full border border-gtr-border"></p>
+    </div>
+  </div>
+
+  <!-- 頁面底部 -->
+  <footer class="border-t border-gtr-border/60 py-6 text-center text-xs text-gtr-textMuted font-mono">
+    <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+      <span>Geo BeybladeX DIY轉速器 by l.ctak</span>
+      <span>自適應介面 · 支援手機 / 電腦</span>
+    </div>
+  </footer>
+
+  <script>
+    // 5x7 ASCII 字型點陣表
+    const FONT_5X7 = [
+      0x00,0x00,0x00,0x00,0x00, 0x00,0x00,0x5F,0x00,0x00, 0x00,0x07,0x00,0x07,0x00, 0x14,0x7F,0x14,0x7F,0x14,
+      0x24,0x2A,0x7F,0x2A,0x12, 0x23,0x13,0x08,0x64,0x62, 0x36,0x49,0x55,0x22,0x50, 0x00,0x05,0x03,0x00,0x00,
+      0x00,0x1C,0x22,0x41,0x00, 0x00,0x41,0x22,0x1C,0x00, 0x14,0x08,0x3E,0x08,0x14, 0x08,0x08,0x3E,0x08,0x08,
+      0x00,0x50,0x30,0x00,0x00, 0x08,0x08,0x08,0x08,0x08, 0x00,0x60,0x60,0x00,0x00, 0x20,0x10,0x08,0x04,0x02,
+      0x3E,0x51,0x49,0x45,0x3E, 0x00,0x42,0x7F,0x40,0x00, 0x42,0x61,0x51,0x49,0x46, 0x21,0x41,0x45,0x4B,0x31,
+      0x18,0x14,0x12,0x7F,0x10, 0x27,0x45,0x45,0x45,0x39, 0x3C,0x4A,0x49,0x49,0x30, 0x01,0x71,0x09,0x05,0x03,
+      0x36,0x49,0x49,0x49,0x36, 0x06,0x49,0x49,0x29,0x1E, 0x00,0x36,0x36,0x00,0x00, 0x00,0x56,0x36,0x00,0x00,
+      0x08,0x14,0x22,0x41,0x80, 0x14,0x14,0x14,0x14,0x14, 0x00,0x41,0x22,0x14,0x08, 0x02,0x01,0x51,0x09,0x06,
+      0x32,0x49,0x79,0x41,0x3E, 0x7E,0x11,0x11,0x11,0x7E, 0x7F,0x49,0x49,0x49,0x36, 0x3E,0x41,0x41,0x41,0x22,
+      0x7F,0x41,0x41,0x22,0x1C, 0x7F,0x49,0x49,0x49,0x41, 0x7F,0x09,0x09,0x09,0x01, 0x3E,0x41,0x49,0x49,0x7A,
+      0x7F,0x08,0x08,0x08,0x7F, 0x00,0x41,0x7F,0x41,0x00, 0x20,0x40,0x41,0x3F,0x01, 0x7F,0x08,0x14,0x22,0x41,
+      0x7F,0x40,0x40,0x40,0x40, 0x7F,0x02,0x0C,0x02,0x7F, 0x7F,0x04,0x08,0x10,0x7F, 0x3E,0x41,0x41,0x41,0x3E,
+      0x7F,0x09,0x09,0x09,0x06, 0x3E,0x41,0x51,0x21,0x5E, 0x7F,0x09,0x19,0x29,0x46, 0x46,0x49,0x49,0x49,0x31,
+      0x01,0x01,0x7F,0x01,0x01, 0x3F,0x40,0x40,0x40,0x3F, 0x1F,0x20,0x40,0x20,0x1F, 0x7F,0x20,0x18,0x20,0x7F,
+      0x63,0x14,0x08,0x14,0x63, 0x07,0x08,0x70,0x08,0x07, 0x61,0x51,0x49,0x45,0x43, 0x00,0x7F,0x41,0x41,0x00,
+      0x02,0x04,0x08,0x10,0x20, 0x00,0x41,0x41,0x7F,0x00, 0x04,0x02,0x01,0x02,0x04, 0x40,0x40,0x40,0x40,0x40,
+      0x00,0x01,0x02,0x04,0x00, 0x20,0x54,0x54,0x54,0x78, 0x7F,0x48,0x44,0x44,0x38, 0x38,0x44,0x44,0x44,0x20,
+      0x38,0x44,0x44,0x48,0x7F, 0x38,0x54,0x54,0x54,0x18, 0x08,0x7E,0x09,0x01,0x02, 0x0C,0x52,0x52,0x52,0x3E,
+      0x7F,0x08,0x04,0x04,0x78, 0x00,0x44,0x7D,0x40,0x00, 0x20,0x40,0x44,0x3D,0x00, 0x7F,0x10,0x28,0x44,0x00,
+      0x00,0x41,0x7F,0x40,0x00, 0x7C,0x04,0x18,0x04,0x78, 0x7C,0x08,0x04,0x04,0x78, 0x38,0x44,0x44,0x44,0x38,
+      0x7C,0x14,0x14,0x14,0x08, 0x08,0x14,0x14,0x18,0x7C, 0x7C,0x08,0x04,0x04,0x08, 0x48,0x54,0x54,0x54,0x20,
+      0x04,0x3F,0x44,0x40,0x20, 0x3C,0x40,0x40,0x20,0x7C, 0x1C,0x20,0x40,0x20,0x1C, 0x3C,0x40,0x30,0x40,0x3C,
+      0x44,0x28,0x10,0x28,0x44, 0x0C,0x50,0x50,0x50,0x3C, 0x44,0x64,0x54,0x4C,0x44, 0x00,0x08,0x36,0x41,0x00,
+      0x00,0x00,0x7F,0x00,0x00, 0x00,0x41,0x36,0x08,0x00, 0x10,0x08,0x08,0x10,0x08
+    ];
+
+    class OLEDDrawer {
+      constructor(canvas) {
+        this.ctx = canvas.getContext('2d');
+        this.x = 0;
+        this.y = 0;
+        this.size = 1;
+      }
+      clear() {
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillRect(0, 0, 128, 32);
+        this.ctx.fillStyle = '#ffffff';
+      }
+      cursor(x, y) { this.x = x; this.y = y; return this; }
+      sizeTo(s) { this.size = s; return this; }
+      px(x, y, color = '#ffffff') {
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      }
+      h(x, y, w, color = '#ffffff') {
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(Math.round(x), Math.round(y), w, 1);
+      }
+      v(x, y, h, color = '#ffffff') {
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(Math.round(x), Math.round(y), 1, h);
+      }
+      rect(x, y, w, h, color = '#ffffff') {
+        this.h(x, y, w, color);
+        this.h(x, y + h - 1, w, color);
+        this.v(x, y, h, color);
+        this.v(x + w - 1, y, h, color);
+      }
+      fill(x, y, w, h, color = '#ffffff') {
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(Math.round(x), Math.round(y), w, h);
+      }
+      line(x0, y0, x1, y1) {
+        let dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        let dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        let err = dx + dy;
+        while (true) {
+          this.px(x0, y0);
+          if (x0 === x1 && y0 === y1) break;
+          let e2 = 2 * err;
+          if (e2 >= dy) { err += dy; x0 += sx; }
+          if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+      }
+      printChar(x, y, char, s = this.size) {
+        const code = char.charCodeAt(0);
+        if (code < 32 || code > 126) return;
+        const idx = (code - 32) * 5;
+        this.ctx.fillStyle = '#ffffff';
+        for (let col = 0; col < 5; col++) {
+          const byte = FONT_5X7[idx + col];
+          for (let row = 0; row < 7; row++) {
+            if (byte & (1 << row)) {
+              this.ctx.fillRect(x + col * s, y + row * s, s, s);
+            }
+          }
+        }
+      }
+      print(str) {
+        for (const ch of str) {
+          if (ch === '\n') {
+            this.y += 8 * this.size;
+            this.x = 0;
+          } else {
+            this.printChar(this.x, this.y, ch, this.size);
+            this.x += 6 * this.size;
+          }
+        }
+        return this;
+      }
+      batteryIcon(seg = 4) {
+        const x = 120, y = 2;
+        this.rect(x, y + 2, 7, 28);
+        this.fill(x + 2, y, 3, 2);
+        for (let i = 0; i < seg; i++) {
+          if (i === 0) this.fill(x + 2, y + 22, 3, 6);
+          else this.fill(x + 2, y + 22 - i * 6, 3, 5);
+        }
+      }
+    }
+
+    function renderScreen(canvas, screenType) {
+      if (!canvas) return;
+      const oled = new OLEDDrawer(canvas);
+      oled.clear();
+
+      switch (screenType) {
+        case 'diy-boot':
+          oled.cursor(0, 4).sizeTo(1).print('(|) View history... 3');
+          oled.cursor(16, 18).print('3x:Cal  5x:Reset');
+          break;
+        case 'diy-ready':
+          oled.cursor(0, 0).sizeTo(1).print('Ready:');
+          oled.v(78, 0, 32);
+          ['8450', '8320', '8190', '7950'].forEach((val, i) => oled.cursor(81, i * 8).print(val));
+          break;
+        case 'diy-result':
+          oled.cursor(0, 0).sizeTo(1).print('Max RPM:');
+          oled.sizeTo(2).cursor(0, 16).print('8450');
+          oled.v(78, 0, 32);
+          oled.sizeTo(1);
+          ['8450', '8320', '8190', '7950'].forEach((val, i) => oled.cursor(81, i * 8).print(val));
+          break;
+        case 'diy-cal-start':
+          oled.cursor(14, 4).sizeTo(1).print('Auto Calibration');
+          oled.cursor(20, 18).print('Start in 5s...');
+          break;
+        case 'diy-cal-waiting':
+          oled.cursor(14, 2).sizeTo(1).print('Launch NOW to Cal');
+          oled.cursor(16, 14).print('Waiting Shoot...');
+          oled.cursor(20, 24).print('Time: 8s');
+          break;
+        case 'diy-cal-done':
+          oled.sizeTo(2).cursor(14, 2).print('Cal Done!');
+          oled.sizeTo(1).cursor(18, 20).print('H:250  L:100');
+          break;
+        case 'ready-classic':
+          oled.sizeTo(1).cursor(0, 0).print('Ready:');
+          oled.v(78, 0, 32);
+          ['8450', '8320', '8190', '7950'].forEach((val, i) => oled.cursor(81, i * 8).print(val));
+          oled.batteryIcon(4);
+          break;
+        case 'result-curve':
+          oled.sizeTo(1).cursor(0, 0).print('RPM: 8450');
+          oled.v(8, 12, 19);
+          oled.h(8, 31, 108);
+          let prevX = 8, prevY = 31;
+          for (let i = 1; i <= 108; i++) {
+            let ratio = i / 108;
+            let targetY = ratio < 0.15 
+              ? 31 - (ratio / 0.15) * 19 
+              : 12 + Math.pow((ratio - 0.15) / 0.85, 0.6) * 11;
+            oled.line(prevX, Math.round(prevY), 8 + i, Math.round(targetY));
+            prevX = 8 + i;
+            prevY = targetY;
+          }
+          oled.batteryIcon(4);
+          break;
+        case 'rename':
+          oled.cursor(14, 0).print('Rename User 1');
+          const startX = 19;
+          oled.cursor(startX - 8, 11).print('[').cursor(startX + 15 * 6 + 2, 11).print(']');
+          oled.cursor(startX, 11).print('GEOFFREY       ');
+          oled.h(startX, 20, 5);
+          oled.cursor(4, 24).print('L/R: Change Ent:Next');
+          break;
+        case 'sensor-cal':
+          oled.cursor(14, 2).print('Launch NOW to Cal');
+          oled.cursor(16, 14).print('Waiting Shoot...');
+          oled.cursor(16, 24).print('Time: 8s Ent:Exit');
+          break;
+        case 'tg':
+          oled.fill(2, 1, 29, 29);
+          const qrRows = [
+            0x1FE79F8,0x1024108,0x14E5CE8,0x14E45E8,0x14E59E8,0x1024008,0x1FE77F8,
+            0x0000000,0x1B86734,0x1055890,0x0276D38,0x19AA844,0x0733560,0x1ACF014,
+            0x0AB05A8,0x17BB254,0x038DF24,0x0000000,0x1FE7BE8,0x1024084,0x14E5F54,
+            0x14E4554,0x14E5D48,0x1024310,0x1FE7AA8
+          ];
+          qrRows.forEach((row, y) => {
+            for (let x = 0; x < 25; x++) {
+              if ((row >> (24 - x)) & 1) oled.px(4 + x, 3 + y, '#000000');
+            }
+          });
+          oled.cursor(36, 6).print('TG Group');
+          oled.cursor(36, 16).print('@GeoBeybladeX');
+          break;
+      }
+    }
+
+    // 滑動指示器更新邏輯
+    function updateTabIndicator(activeBtn) {
+      const slider = document.getElementById('tab-slider');
+      if (!slider || !activeBtn) return;
+      slider.style.width = `${activeBtn.offsetWidth}px`;
+      slider.style.transform = `translateX(${activeBtn.offsetLeft}px)`;
+    }
+
+    // 分頁切換功能
+    function switchTab(tabId) {
+      const tabs = ['home', 'diy', 'pro'];
+      let targetBtn = null;
+      tabs.forEach(t => {
+        const pageEl = document.getElementById(`page-${t}`);
+        const btnEl = document.getElementById(`tab-btn-${t}`);
+        if (t === tabId) {
+          pageEl.classList.remove('hidden');
+          btnEl.classList.add('active');
+          btnEl.classList.remove('text-gtr-textMuted');
+          targetBtn = btnEl;
+        } else {
+          pageEl.classList.add('hidden');
+          btnEl.classList.remove('active');
+          btnEl.classList.add('text-gtr-textMuted');
+        }
+      });
+      if (targetBtn) {
+        updateTabIndicator(targetBtn);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 圖片燈箱放大控制
+    function openLightbox(src, caption) {
+      const modal = document.getElementById('lightbox-modal');
+      const img = document.getElementById('lightbox-img');
+      const cap = document.getElementById('lightbox-caption');
+      img.src = src;
+      img.alt = caption;
+      cap.textContent = caption;
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+      }, 10);
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('lightbox-modal');
+      modal.classList.add('opacity-0');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }, 300);
+    }
+
+    // ESC 鍵關閉燈箱
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeLightbox();
+      }
+    });
+
+    // 鼠標動態追蹤環境光暈
+    const glowEl = document.getElementById('mouse-glow');
+    let targetX = window.innerWidth / 2, targetY = window.innerHeight / 2;
+    let currentX = targetX, currentY = targetY;
+
+    window.addEventListener('mousemove', (e) => {
+      targetX = e.clientX;
+      targetY = e.clientY;
+    });
+
+    function animateGlow() {
+      currentX += (targetX - currentX) * 0.08;
+      currentY += (targetY - currentY) * 0.08;
+      if (glowEl) {
+        glowEl.style.transform = `translate3d(${currentX - 260}px, ${currentY - 260}px, 0)`;
+      }
+      requestAnimationFrame(animateGlow);
+    }
+    requestAnimationFrame(animateGlow);
+
+    // 初始化網頁與 OLED 繪製
+    window.addEventListener('DOMContentLoaded', () => {
+      // 繪製 OLED 像素畫面
+      document.querySelectorAll('canvas[data-screen]').forEach(canvas => {
+        renderScreen(canvas, canvas.dataset.screen);
+      });
+
+      // 初始化頁籤指示器
+      const activeBtn = document.querySelector('.tab-btn.active');
+      if (activeBtn) updateTabIndicator(activeBtn);
+    });
+
+    window.addEventListener('resize', () => {
+      const activeBtn = document.querySelector('.tab-btn.active');
+      if (activeBtn) updateTabIndicator(activeBtn);
+    });
+  </script>
+</body>
+</html>
